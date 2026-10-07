@@ -1,0 +1,15 @@
+{
+  "name": "io-guard",
+  "owner": {
+    "name": "Flavio Martil"
+  },
+  "plugins": [
+    {
+      "name": "io-guard",
+      "description": "In-process IO Sanitizer and Guard: in-memory output truncation, secret redaction, Rule 875 writing style linter and branch target protection.",
+      "source": "./",
+      "version": "0.1.0"
+    }
+  ],
+  "description": "IO-Guard: in-memory truncation, redaction and safety guard for Claude Code."
+}

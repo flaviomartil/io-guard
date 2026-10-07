@@ -1,0 +1,13 @@
+{
+  "name": "io-guard",
+  "version": "0.1.0",
+  "description": "In-process IO Sanitizer and Guard for Claude Code",
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  }
+}

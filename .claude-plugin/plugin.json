@@ -1,0 +1,34 @@
+{
+  "name": "io-guard",
+  "version": "0.1.0",
+  "description": "In-process IO Sanitizer and Guard: in-memory output truncation, secret redaction, Rule 875 writing style linter and branch target protection.",
+  "author": {
+    "name": "Flavio Martil"
+  },
+  "userConfig": {
+    "maxLines": {
+      "type": "number",
+      "title": "Max Output Lines",
+      "description": "Maximum tool output lines before truncation triggers.",
+      "default": 150
+    },
+    "redactSecrets": {
+      "type": "boolean",
+      "title": "Redact Secrets",
+      "description": "Automatically mask API keys, tokens, and credentials in tool outputs.",
+      "default": true
+    },
+    "enforceRule875": {
+      "type": "boolean",
+      "title": "Enforce Rule 875 Writing Style",
+      "description": "Block em-dashes and emojis in outbound commits, PRs, and DevOps comments.",
+      "default": true
+    },
+    "enforceBranchTargets": {
+      "type": "boolean",
+      "title": "Enforce Branch Target Guard",
+      "description": "Block forbidden pushes to protected branches.",
+      "default": true
+    }
+  }
+}
