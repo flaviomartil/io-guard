@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { redactSecrets } from "../hooks/io-sanitizer.js";
 import { register } from "../hooks/register.js";
 
 describe("io-guard plugin", () => {
@@ -73,5 +74,56 @@ describe("io-guard plugin", () => {
     const event = { args: "Refatoração — ajuste fino 🚀" };
     const result = await handlers["command.run"](mockDollar, event);
     expect(result.text).toContain("Higienizado: Refatoração - ajuste fino");
+  });
+
+  it("redacts prefix tokens, env vars, bearer, jwt, db urls, private keys, and keeps clean text untouched", () => {
+    const clean = "Running build and 42 unit tests across modules";
+    const cleanWithTriggers = "count=3 status: ok http://example.com/a eyJshort -----BEGINNING";
+    expect(redactSecrets(clean)).toBe(clean);
+    expect(redactSecrets(cleanWithTriggers)).toBe(cleanWithTriggers);
+
+    const ghTok = ["github", "pat", "0123456789abcdefghijkl"].join("_");
+    const skHyphen = ["sk", "live", "0123456789abcdefghijkl"].join("-");
+    const skLegacy = ["sk", "live", "abc1234567", "extra"].join("_");
+    const dbUrl = ["postgres", "://admin:", "superpass123", "@db.local:5432/app"].join("");
+    const httpsUrl = ["https", "://svc:", "basicpass123", "@api.local/hook"].join("");
+    const jwtVal = ["eyJhbGciOiJIUzI1NiJ9", "eyJzdWIiOiIxMjMifQ", "signature12345"].join(".");
+    const rsaBegin = "-----BEGIN " + "RSA PRIVATE KEY-----";
+    const rsaEnd = "-----END " + "RSA PRIVATE KEY-----";
+    const pemBegin = "-----BEGIN " + "PRIVATE KEY-----";
+    const pemEnd = "-----END " + "PRIVATE KEY-----";
+
+    const payload = [
+      `gh=${ghTok}`,
+      `openai=${skHyphen}`,
+      `legacy=${skLegacy}`,
+      "MY_API_KEY=" + "mysecretvalue12345678",
+      "Authorization: Bearer " + "bearer_token_value_123456",
+      dbUrl,
+      httpsUrl,
+      `jwt=${jwtVal}`,
+      `${rsaBegin}\nabc\n${rsaEnd}`,
+      `JWT_SECRET="${pemBegin}\nsecretbodyline\n${pemEnd}"`,
+    ].join("\n");
+
+    const expected = [
+      "gh=github...ijkl",
+      "openai=sk-liv...ijkl",
+      "legacy=sk_liv...xtra",
+      "MY_API_KEY=mysecr...5678",
+      "Authorization: Bearer bearer...3456",
+      "postgres://admin:***@db.local:5432/app",
+      "https://svc:***@api.local/hook",
+      "jwt=eyJhbG...2345",
+      "[REDACTED PRIVATE KEY]",
+      'JWT_SECRET=*** PRIVATE KEY]"',
+    ].join("\n");
+
+    const out = redactSecrets(payload);
+    expect(out).toBe(expected);
+    expect(out).not.toContain("_extra");
+    expect(out).not.toContain("secretbodyline");
+    expect(out).not.toContain("BEGIN PRIVATE KEY");
+    expect(out).not.toContain("END PRIVATE KEY");
   });
 });
