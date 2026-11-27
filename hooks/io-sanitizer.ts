@@ -35,7 +35,7 @@ const COMBINED_PREFIX_PATTERN =
 const ENV_SECRET_RE =
   /\b([A-Z0-9_]{1,50}(?:API_?KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH)[A-Z0-9_]{0,50})\s*=\s*(\S+)/gi;
 const JSON_SECRET_RE =
-  /\b("(?:api_?[Kk]ey|token|secret|password|access_token|refresh_token|auth_token|bearer|secret_value|raw_secret|key_material)")\s*:\s*"([^"]+)"/gi;
+  /(?<![\w"])("(?:api_?[Kk]ey|token|secret|password|access_token|refresh_token|auth_token|bearer|secret_value|raw_secret|key_material|client_secret)")\s*:\s*"((?:[^"\\]|\\.)+)"/gi;
 const BEARER_RE = /(Authorization:\s*Bearer\s+)(\S+)/gi;
 const PRIVATE_KEY_RE = /-----BEGIN[A-Z ]*PRIVATE KEY-----[\s\S]*?-----END[A-Z ]*PRIVATE KEY-----/g;
 const DB_URL_RE = /((?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp):\/\/[^:]+:)([^@]+)(@)/gi;

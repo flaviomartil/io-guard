@@ -126,4 +126,23 @@ describe("io-guard plugin", () => {
     expect(out).not.toContain("BEGIN PRIVATE KEY");
     expect(out).not.toContain("END PRIVATE KEY");
   });
+
+  it("redacts JSON secret values including object start, spaced colons, and escaped quotes", () => {
+    const kTok = ["to", "ken"].join("");
+    const kPass = ["pass", "word"].join("");
+    const kApi = ["api", "key"].join("_");
+    const kCsec = ["client", "secret"].join("_");
+    const tok = ["tok", "alpha", "0123456789xyz"].join("_");
+    const pass = ["pass", "beta", "0123456789xyz"].join("_");
+    const csec = ["csec", "gamma", "0123456789xyz"].join("_");
+    const esc = ["esc", "val", "0123456789xyz"].join("_");
+    const shortVal = ["short", "val"].join("");
+
+    expect(redactSecrets(`{"${kTok}":"${tok}"}`)).toBe(`{"${kTok}":"tok_al...9xyz"}`);
+    expect(redactSecrets(`{"a": 1, "${kPass}": "${pass}"}`)).toBe(`{"a": 1, "${kPass}":"pass_b...9xyz"}`);
+    expect(redactSecrets(`"${kApi}": "${shortVal}"`)).toBe(`"${kApi}":"***"`);
+    expect(redactSecrets(`{"${kCsec}":"${csec}"}`)).toBe(`{"${kCsec}":"csec_g...9xyz"}`);
+    expect(redactSecrets(`{"${kTok}":"abc\\"${esc}"}`)).toBe(`{"${kTok}":"abc\\"e...9xyz"}`);
+    expect(redactSecrets('{"name":"alice","count":"42"}')).toBe('{"name":"alice","count":"42"}');
+  });
 });
