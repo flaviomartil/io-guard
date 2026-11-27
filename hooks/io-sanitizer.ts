@@ -29,41 +29,18 @@ export interface WritingValidationResult {
 /*                               SECRET REDACTION                             */
 /* -------------------------------------------------------------------------- */
 
-const PREFIX_PATTERNS = [
-  /sk-[A-Za-z0-9_-]{10,}/g,
-  /ghp_[A-Za-z0-9]{10,}/g,
-  /github_pat_[A-Za-z0-9_]{10,}/g,
-  /gho_[A-Za-z0-9]{10,}/g,
-  /ghu_[A-Za-z0-9]{10,}/g,
-  /ghs_[A-Za-z0-9]{10,}/g,
-  /ghr_[A-Za-z0-9]{10,}/g,
-  /xox[baprs]-[A-Za-z0-9-]{10,}/g,
-  /AIza[A-Za-z0-9_-]{30,}/g,
-  /pplx-[A-Za-z0-9]{10,}/g,
-  /fal_[A-Za-z0-9_-]{10,}/g,
-  /fc-[A-Za-z0-9]{10,}/g,
-  /bb_live_[A-Za-z0-9_-]{10,}/g,
-  /gAAAA[A-Za-z0-9_=-]{20,}/g,
-  /AKIA[A-Z0-9]{16}/g,
-  /sk_live_[A-Za-z0-9]{10,}/g,
-  /sk_test_[A-Za-z0-9]{10,}/g,
-  /rk_live_[A-Za-z0-9]{10,}/g,
-  /SG\.[A-Za-z0-9_-]{10,}/g,
-  /hf_[A-Za-z0-9]{10,}/g,
-  /r8_[A-Za-z0-9]{10,}/g,
-  /npm_[A-Za-z0-9]{10,}/g,
-  /pypi-[A-Za-z0-9_-]{10,}/g,
-  /dop_v1_[A-Za-z0-9]{10,}/g,
-  /doo_v1_[A-Za-z0-9]{10,}/g,
-  /sk_[A-Za-z0-9_]{10,}/g,
-  /tvly-[A-Za-z0-9]{10,}/g,
-  /exa_[A-Za-z0-9]{10,}/g,
-  /gsk_[A-Za-z0-9]{10,}/g,
-  /syt_[A-Za-z0-9]{10,}/g,
-  /mem0_[A-Za-z0-9]{10,}/g,
-  /brv_[A-Za-z0-9]{10,}/g,
-  /fcaebeeb[A-Za-z0-9]{20,}/g,
-];
+const COMBINED_PREFIX_PATTERN =
+  /(?:github_pat_[A-Za-z0-9_]{10,}|gh[pousr]_[A-Za-z0-9]{10,}|rk_live_[A-Za-z0-9]{10,}|sk_[A-Za-z0-9_]{10,}|sk-[A-Za-z0-9_-]{10,}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[A-Za-z0-9_-]{30,}|pplx-[A-Za-z0-9]{10,}|fal_[A-Za-z0-9_-]{10,}|fc-[A-Za-z0-9]{10,}|bb_live_[A-Za-z0-9_-]{10,}|gAAAA[A-Za-z0-9_=-]{20,}|AKIA[A-Z0-9]{16}|SG\.[A-Za-z0-9_-]{10,}|hf_[A-Za-z0-9]{10,}|r8_[A-Za-z0-9]{10,}|npm_[A-Za-z0-9]{10,}|pypi-[A-Za-z0-9_-]{10,}|dop_v1_[A-Za-z0-9]{10,}|doo_v1_[A-Za-z0-9]{10,}|tvly-[A-Za-z0-9]{10,}|exa_[A-Za-z0-9]{10,}|gsk_[A-Za-z0-9]{10,}|syt_[A-Za-z0-9]{10,}|mem0_[A-Za-z0-9]{10,}|brv_[A-Za-z0-9]{10,}|fcaebeeb[A-Za-z0-9]{20,})/g;
+
+const ENV_SECRET_RE =
+  /\b([A-Z0-9_]{1,50}(?:API_?KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH)[A-Z0-9_]{0,50})\s*=\s*(\S+)/gi;
+const JSON_SECRET_RE =
+  /\b("(?:api_?[Kk]ey|token|secret|password|access_token|refresh_token|auth_token|bearer|secret_value|raw_secret|key_material)")\s*:\s*"([^"]+)"/gi;
+const BEARER_RE = /(Authorization:\s*Bearer\s+)(\S+)/gi;
+const PRIVATE_KEY_RE = /-----BEGIN[A-Z ]*PRIVATE KEY-----[\s\S]*?-----END[A-Z ]*PRIVATE KEY-----/g;
+const DB_URL_RE = /((?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp):\/\/[^:]+:)([^@]+)(@)/gi;
+const JWT_RE = /(eyJ[A-Za-z0-9_-]{10,}(?:\.[A-Za-z0-9_=-]{4,}){0,2})/g;
+const BASIC_AUTH_URL_RE = /(https?|wss?|ftp):\/\/([^/\s:@]+):([^/\s@]+)@/gi;
 
 export function maskToken(token: string): string {
   if (!token || token.length < 18) return "***";
@@ -72,53 +49,32 @@ export function maskToken(token: string): string {
 
 export function redactSecrets(text: string): string {
   if (!text) return text;
-  let result = text;
+  let result = text.replace(COMBINED_PREFIX_PATTERN, (m) => maskToken(m));
 
-  for (const pattern of PREFIX_PATTERNS) {
-    result = result.replace(pattern, (m) => maskToken(m));
+  if (result.includes("-----BEGIN")) {
+    result = result.replace(PRIVATE_KEY_RE, "[REDACTED PRIVATE KEY]");
   }
 
-  // Key=Value assignments
-  result = result.replace(
-    /\b([A-Z0-9_]{1,50}(?:API_?KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH)[A-Z0-9_]{0,50})\s*=\s*(\S+)/gi,
-    (_, name, value) => `${name}=${maskToken(value)}`
-  );
+  if (result.includes("=")) {
+    result = result.replace(ENV_SECRET_RE, (_, name, value) => `${name}=${maskToken(value)}`);
+  }
 
-  // JSON key-values
-  result = result.replace(
-    /\b("(?:api_?[Kk]ey|token|secret|password|access_token|refresh_token|auth_token|bearer|secret_value|raw_secret|key_material)")\s*:\s*"([^"]+)"/gi,
-    (_, key, value) => `${key}:"${maskToken(value)}"`
-  );
+  if (result.includes(":")) {
+    result = result.replace(JSON_SECRET_RE, (_, key, value) => `${key}:"${maskToken(value)}"`);
+    result = result.replace(BEARER_RE, (_, prefix, token) => `${prefix}${maskToken(token)}`);
+  }
 
-  // Authorization Bearer
-  result = result.replace(
-    /(Authorization:\s*Bearer\s+)(\S+)/gi,
-    (_, prefix, token) => `${prefix}${maskToken(token)}`
-  );
+  if (result.includes("://")) {
+    result = result.replace(DB_URL_RE, (_, prefix, _pass, suffix) => `${prefix}***${suffix}`);
+  }
 
-  // Private keys
-  result = result.replace(
-    /-----BEGIN[A-Z ]*PRIVATE KEY-----[\s\S]*?-----END[A-Z ]*PRIVATE KEY-----/g,
-    "[REDACTED PRIVATE KEY]"
-  );
+  if (result.includes("eyJ")) {
+    result = result.replace(JWT_RE, (m) => maskToken(m));
+  }
 
-  // Database URLs with passwords
-  result = result.replace(
-    /((?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp):\/\/[^:]+:)([^@]+)(@)/gi,
-    (_, prefix, _pass, suffix) => `${prefix}***${suffix}`
-  );
-
-  // JWTs
-  result = result.replace(
-    /(eyJ[A-Za-z0-9_-]{10,}(?:\.[A-Za-z0-9_=-]{4,}){0,2})/g,
-    (m) => maskToken(m)
-  );
-
-  // Generic Basic Auth URLs
-  result = result.replace(
-    /(https?|wss?|ftp):\/\/([^/\s:@]+):([^/\s@]+)@/gi,
-    (_, scheme, user) => `${scheme}://${user}:***@`
-  );
+  if (result.includes("://")) {
+    result = result.replace(BASIC_AUTH_URL_RE, (_, scheme, user) => `${scheme}://${user}:***@`);
+  }
 
   return result;
 }
